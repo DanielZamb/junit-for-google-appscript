@@ -11,15 +11,6 @@
     // Event listeners
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
     
-    // Advanced tests button
-    const advancedBtn = document.getElementById('runAdvancedTests');
-    if (advancedBtn) {
-      advancedBtn.addEventListener('click', function() {
-        showLoadingOverlay();
-        startAdvancedTestExecution();
-      });
-    }
-    
     // Show loading overlay initially
     showLoadingOverlay();
     
@@ -98,49 +89,18 @@
   function startAdvancedTestExecution() {
     testStartTime = Date.now();
     
-    // Run advanced tests in two phases to avoid timeouts
     google.script.run
-      .withSuccessHandler((phase1Results) => {
-        console.log('Advanced Phase 1 results:', phase1Results);
-
-        google.script.run
-          .withSuccessHandler((phase2Results) => {
-            console.log('Advanced Phase 2 results:', phase2Results);
-            const merged = mergeTestResults(phase1Results, phase2Results);
-            hideLoadingOverlay();
-            displayTestResults(merged);
-          })
-          .withFailureHandler((error) => {
-            console.error('Advanced Phase 2 failed:', error.stack);
-            hideLoadingOverlay();
-            showErrorMessage(error.stack);
-          })
-          .runnerAdvancedPhase2();
+      .withSuccessHandler((testResults) => {
+        console.log('Test results received:', testResults);
+        hideLoadingOverlay();
+        displayTestResults(testResults);
       })
       .withFailureHandler((error) => {
-        console.error('Advanced Phase 1 failed:', error.stack);
+        console.error('Test execution failed:', error.stack);
         hideLoadingOverlay();
         showErrorMessage(error.stack);
       })
-      .runnerAdvancedPhase1();
-  }
-
-  function mergeTestResults(r1, r2) {
-    const mergedCounts = {
-      passed: (r1.testCounts?.passed || 0) + (r2.testCounts?.passed || 0),
-      failed: (r1.testCounts?.failed || 0) + (r2.testCounts?.failed || 0),
-      skipped: (r1.testCounts?.skipped || 0) + (r2.testCounts?.skipped || 0),
-      todo: (r1.testCounts?.todo || 0) + (r2.testCounts?.todo || 0),
-      total: (r1.testCounts?.total || 0) + (r2.testCounts?.total || 0),
-    };
-    const merged = {
-      testCounts: mergedCounts,
-      runtime: (r1.runtime || 0) + (r2.runtime || 0),
-      status: mergedCounts.failed > 0 ? 'failed' : 'passed',
-      tests: [...(r1.tests || []), ...(r2.tests || [])],
-      sourceCode: r1.sourceCode || r2.sourceCode || '',
-    };
-    return merged;
+      .runnerAdvanced();
   }
 
   function showErrorMessage(error) {

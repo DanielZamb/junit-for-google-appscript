@@ -7,6 +7,11 @@
         "version": "0",
         "libraryId": "1TJEgrBnjb_B8PVCnHstDzMmllYqR2dZuBVQUvprPYohST5uwPBuuxfcI",
         "developmentMode": true
+      },
+      {
+        "userSymbol": "OAuth2",
+        "version": "43",
+        "libraryId": "1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF"
       }
     ]
   },
@@ -14,6 +19,6 @@
   "runtimeVersion": "V8",
   "webapp": {
     "executeAs": "USER_DEPLOYING",
-    "access": "MYSELF"
+    "access": "ANYONE_ANONYMOUS"
   }
 }
