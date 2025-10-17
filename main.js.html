@@ -1,0 +1,753 @@
+<script>
+  // Global variables for timing
+  let testStartTime = null;
+  let loadingTimer = null;
+  let loadingStartTime = null;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize theme
+    initializeTheme();
+    
+    // Event listeners
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    
+    // Advanced tests button
+    const advancedBtn = document.getElementById('runAdvancedTests');
+    if (advancedBtn) {
+      advancedBtn.addEventListener('click', function() {
+        showLoadingOverlay();
+        startAdvancedTestExecution();
+      });
+    }
+    
+    // Show loading overlay initially
+    showLoadingOverlay();
+    
+    // Start the test runner
+    startTestExecution();
+  });
+
+  function initializeTheme() {
+    // Get saved theme or default to light
+    const savedTheme = localStorage.getItem('preferred-theme') || 'light';
+    // Apply theme to document
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+  
+  function toggleTheme() {
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('preferred-theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('preferred-theme', 'dark');
+    }
+    
+    // Recreate icons to update theme-specific icons
+    lucide.createIcons();
+  }
+
+  function showLoadingOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.remove('hidden');
+    
+    // Start loading timer
+    loadingStartTime = Date.now();
+    const timerElement = document.getElementById('loading-timer');
+    
+    loadingTimer = setInterval(() => {
+      const elapsed = (Date.now() - loadingStartTime) / 1000;
+      timerElement.textContent = `${elapsed.toFixed(1)}s`;
+    }, 100);
+  }
+
+  function hideLoadingOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.add('hidden');
+    
+    // Clear loading timer
+    if (loadingTimer) {
+      clearInterval(loadingTimer);
+      loadingTimer = null;
+    }
+  }
+
+  function startTestExecution() {
+    testStartTime = Date.now();
+    
+    google.script.run
+      .withSuccessHandler((testResults) => {
+        console.log('Test results received:', testResults);
+        hideLoadingOverlay();
+        displayTestResults(testResults);
+      })
+      .withFailureHandler((error) => {
+        console.error('Test execution failed:', error.stack);
+        hideLoadingOverlay();
+        showErrorMessage(error.stack);
+      })
+      .runner();
+  }
+
+  function startAdvancedTestExecution() {
+    testStartTime = Date.now();
+    
+    // Run advanced tests in two phases to avoid timeouts
+    google.script.run
+      .withSuccessHandler((phase1Results) => {
+        console.log('Advanced Phase 1 results:', phase1Results);
+
+        google.script.run
+          .withSuccessHandler((phase2Results) => {
+            console.log('Advanced Phase 2 results:', phase2Results);
+            const merged = mergeTestResults(phase1Results, phase2Results);
+            hideLoadingOverlay();
+            displayTestResults(merged);
+          })
+          .withFailureHandler((error) => {
+            console.error('Advanced Phase 2 failed:', error.stack);
+            hideLoadingOverlay();
+            showErrorMessage(error.stack);
+          })
+          .runnerAdvancedPhase2();
+      })
+      .withFailureHandler((error) => {
+        console.error('Advanced Phase 1 failed:', error.stack);
+        hideLoadingOverlay();
+        showErrorMessage(error.stack);
+      })
+      .runnerAdvancedPhase1();
+  }
+
+  function mergeTestResults(r1, r2) {
+    const mergedCounts = {
+      passed: (r1.testCounts?.passed || 0) + (r2.testCounts?.passed || 0),
+      failed: (r1.testCounts?.failed || 0) + (r2.testCounts?.failed || 0),
+      skipped: (r1.testCounts?.skipped || 0) + (r2.testCounts?.skipped || 0),
+      todo: (r1.testCounts?.todo || 0) + (r2.testCounts?.todo || 0),
+      total: (r1.testCounts?.total || 0) + (r2.testCounts?.total || 0),
+    };
+    const merged = {
+      testCounts: mergedCounts,
+      runtime: (r1.runtime || 0) + (r2.runtime || 0),
+      status: mergedCounts.failed > 0 ? 'failed' : 'passed',
+      tests: [...(r1.tests || []), ...(r2.tests || [])],
+      sourceCode: r1.sourceCode || r2.sourceCode || '',
+    };
+    return merged;
+  }
+
+  function showErrorMessage(error) {
+    const testResults = document.getElementById('test-results');
+    testResults.innerHTML = `
+      <div class="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
+        <div class="flex items-center justify-center mb-4">
+          <i data-lucide="alert-triangle" class="w-8 h-8 text-destructive"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-destructive mb-2">Test Execution Failed</h3>
+        <p class="text-muted-foreground mb-4">An error occurred while running the test suite.</p>
+        <details class="text-left">
+          <summary class="cursor-pointer text-sm font-medium">Error Details</summary>
+          <pre class="mt-2 p-3 bg-muted rounded text-xs font-mono">${error}</pre>
+        </details>
+      </div>
+    `;
+    lucide.createIcons();
+  }
+
+  function animatePercentage(finalPercentage) {
+    const percentElem = document.getElementById('testPassedPerc');
+    let currentPercentage = 0;
+    
+    const animationDuration = 1500;
+    const framesPerSecond = 60;
+    const totalFrames = (animationDuration / 1000) * framesPerSecond;
+    const incrementPerFrame = finalPercentage / totalFrames;
+
+    function updatePercentage() {
+      if (currentPercentage < finalPercentage) {
+        currentPercentage += incrementPerFrame;
+        if (currentPercentage > finalPercentage) {
+          currentPercentage = finalPercentage;
+        }
+        percentElem.textContent = `${currentPercentage.toFixed(1)}%`;
+        requestAnimationFrame(updatePercentage);
+      }
+    }
+
+    requestAnimationFrame(updatePercentage);
+  }
+
+  function updateExecutionTime() {
+    if (testStartTime) {
+      const elapsed = (Date.now() - testStartTime) / 1000;
+      const executionTimeElem = document.getElementById('execution-time');
+      executionTimeElem.textContent = `${elapsed.toFixed(2)}s`;
+    }
+  }
+
+
+  function getStatusIcon(status) {
+    const iconMap = {
+      'passed': '<i data-lucide="check-circle" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>',
+      'failed': '<i data-lucide="x-circle" class="w-5 h-5 text-red-600 dark:text-red-400"></i>',
+      'skipped': '<i data-lucide="minus-circle" class="w-5 h-5 text-amber-600 dark:text-amber-400"></i>',
+      'todo': '<i data-lucide="clock" class="w-5 h-5 text-blue-600 dark:text-blue-400"></i>'
+    };
+    return iconMap[status] || '<i data-lucide="x-circle" class="w-5 h-5 text-red-600 dark:text-red-400"></i>';
+  }
+
+  function getStatusColors(status) {
+    const colorMap = {
+      'passed': {
+        border: 'border-emerald-500',
+        bg: 'bg-emerald-50 dark:bg-emerald-950/20',
+        text: 'text-emerald-700 dark:text-emerald-300'
+      },
+      'failed': {
+        border: 'border-red-500',
+        bg: 'bg-red-50 dark:bg-red-950/20',
+        text: 'text-red-700 dark:text-red-300'
+      },
+      'skipped': {
+        border: 'border-amber-500',
+        bg: 'bg-amber-50 dark:bg-amber-950/20',
+        text: 'text-amber-700 dark:text-amber-300'
+      },
+      'todo': {
+        border: 'border-blue-500',
+        bg: 'bg-blue-50 dark:bg-blue-950/20',
+        text: 'text-blue-700 dark:text-blue-300'
+      }
+    };
+    return colorMap[status] || colorMap['failed'];
+  }
+
+
+  function updateSummaryBadges(counts) {
+    const passedPercent = (counts.passed / counts.total) * 100;
+    const progressBar = document.getElementById('progress-bar');
+    progressBar.style.width = passedPercent + '%';
+    
+    const summaryBadges = document.getElementById('summary-badges');
+    summaryBadges.innerHTML = `
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="px-2 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-md font-medium">
+          <i data-lucide="check" class="w-3 h-3 inline mr-1"></i>
+          ${counts.passed} Passed
+        </span>
+        <span class="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-md font-medium">
+          <i data-lucide="x" class="w-3 h-3 inline mr-1"></i>
+          ${counts.failed} Failed
+        </span>
+        <span class="px-2 py-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded-md font-medium">
+          <i data-lucide="minus" class="w-3 h-3 inline mr-1"></i>
+          ${counts.skipped} Skipped
+        </span>
+        <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-md font-medium">
+          <i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>
+          ${counts.todo} Todo
+        </span>
+        <span class="px-2 py-1 bg-muted text-muted-foreground rounded-md font-medium">
+          Total: ${counts.total}
+        </span>
+      </div>
+    `;
+    
+    // Recreate icons for the badges
+    lucide.createIcons();
+  }
+
+  function createTestElement(test) {
+    const colors = getStatusColors(test.status);
+    const moduleName = test.suiteName || test.fullName[0];
+    
+    const testElement = document.createElement('div');
+    testElement.className = `test-result bg-card border ${colors.border} border-l-4 rounded-lg shadow-sm animate-fade-in`;
+    testElement.setAttribute('data-status', test.status);
+    testElement.setAttribute('data-test-name', (test.name || '').toLowerCase());
+    testElement.setAttribute('data-test-module', (moduleName || '').toLowerCase());
+
+    testElement.innerHTML = `
+      <!-- Test Header -->
+      <div class="test-header cursor-pointer p-4 hover:bg-accent/50 transition-colors rounded-t-lg">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-3 flex-1">
+            <div class="flex-shrink-0">
+              ${getStatusIcon(test.status)}
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-semibold text-lg ${colors.text} test-name">${test.name || 'Unnamed Test'}</h3>
+              ${moduleName ? `
+                <div class="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                  <i data-lucide="folder" class="w-3 h-3"></i>
+                  <span class="test-module-name">${moduleName}</span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-muted-foreground">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            <span class="font-mono">${test.runtime}ms</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Test Details (Hidden by default) -->
+      <div class="test-details hidden border-t border-border">
+        <div class="p-4 space-y-4">
+          <!-- Test View Toggle -->
+          <div class="flex border border-border rounded-md overflow-hidden">
+            <button type="button" class="px-3 py-2 text-sm bg-primary text-primary-foreground transition-colors" data-test-view="results" data-test-name="${test.name}">
+              <i data-lucide="list-checks" class="w-3 h-3 inline mr-1"></i>
+              Results
+            </button>
+            <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors" data-test-view="code" data-test-name="${test.name}">
+              <i data-lucide="code" class="w-3 h-3 inline mr-1"></i>
+              Code
+            </button>
+          </div>
+          
+          <!-- Results View -->
+          <div class="test-results-view" data-test-view-content="results">
+            ${test.assertions && test.assertions.length ? `
+              <div>
+                <h4 class="font-medium text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                  <i data-lucide="list-checks" class="w-4 h-4"></i>
+                  Assertions (${test.assertions.length})
+                </h4>
+                <div class="space-y-2">
+                  ${test.assertions.map(assertion => createAssertionElement(assertion)).join('')}
+                </div>
+              </div>
+            ` : ''}
+            
+            ${test.errors && test.errors.length ? `
+              <div>
+                <h4 class="font-medium text-sm text-destructive mb-2 flex items-center gap-2 mt-3">
+                  <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                  Errors (${test.errors.length})
+                </h4>
+                <div class="space-y-3">
+                  ${test.errors.map(error => createErrorElement(error)).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+          
+          <!-- Code View -->
+          <div class="test-code-view hidden" data-test-view-content="code">
+            <div>
+              <h4 class="font-medium text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                <i data-lucide="code" class="w-4 h-4"></i>
+                Test Implementation
+              </h4>
+              <div class="relative">
+                <pre class="bg-muted/50 rounded-lg p-4 overflow-x-auto text-sm font-mono max-h-64 overflow-y-auto border"><code class="language-javascript">${test.sourceCode || '// Test code not available'}</code></pre>
+                <button 
+                  class="copy-test-code absolute top-3 right-3 p-2 bg-background border border-border rounded-md hover:bg-accent transition-colors"
+                  title="Copy test code"
+                  data-test-name="${test.name}"
+                >
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    return testElement;
+  }
+
+  function createAssertionElement(assertion) {
+    const isSuccess = assertion.result;
+    const statusColor = isSuccess ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400';
+    const bgColor = isSuccess ? 'bg-emerald-50 dark:bg-emerald-950/20' : 'bg-red-50 dark:bg-red-950/20';
+    const borderColor = isSuccess ? 'border-emerald-200 dark:border-emerald-800' : 'border-red-200 dark:border-red-800';
+    
+    return `
+      <div class="assertion-detail p-3 rounded-md border ${borderColor} ${bgColor}">
+        <div class="flex items-start gap-2 mb-2">
+          <div class="flex-shrink-0 mt-0.5">
+            ${isSuccess 
+              ? '<i data-lucide="check" class="w-4 h-4 text-emerald-500"></i>'
+              : '<i data-lucide="x" class="w-4 h-4 text-red-500"></i>'
+            }
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium ${statusColor}">${assertion.message || "No message"}</p>
+          </div>
+        </div>
+        
+        ${assertion.expected !== undefined ? `
+          <div class="ml-6 space-y-1 text-xs font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">Expected:</span>
+              <code class="px-2 py-1 bg-muted rounded text-foreground">${assertion.expected}</code>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">Actual:</span>
+              <code class="px-2 py-1 bg-muted rounded text-foreground">${assertion.actual}</code>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function createErrorElement(error) {
+    return `
+      <div class="error-detail p-4 border border-red-200 dark:border-red-800 rounded-md bg-red-50 dark:bg-red-950/20">
+        <div class="flex items-start gap-2 mb-3">
+          <i data-lucide="alert-circle" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"></i>
+          <div class="flex-1 min-w-0">
+            <p class="font-mono text-sm text-red-700 dark:text-red-300 font-medium leading-relaxed">
+              ${error.message || 'Unknown error'}
+            </p>
+          </div>
+        </div>
+        
+        ${error.source ? `
+          <div class="mt-3 p-3 bg-muted rounded border">
+            <div class="flex items-center gap-2 mb-2">
+              <i data-lucide="code" class="w-4 h-4 text-muted-foreground"></i>
+              <span class="text-sm font-medium text-muted-foreground">Source</span>
+            </div>
+            <code class="text-xs font-mono block text-foreground break-all">${error.source}</code>
+          </div>
+        ` : ''}
+        
+        ${error.runtime ? `
+          <div class="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+            <i data-lucide="clock" class="w-3 h-3"></i>
+            <span class="font-mono">Runtime: ${error.runtime}ms</span>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function displayTestResults(results) {
+    const testResultsContainer = document.getElementById('test-results');
+    testResultsContainer.innerHTML = '';
+    
+    // Update execution time
+    updateExecutionTime();
+    
+    // Update summary badges and progress
+    updateSummaryBadges(results.testCounts);
+    const finalPercentage = (results.testCounts.passed / results.testCounts.total) * 100;
+    
+    // Animate percentage
+    animatePercentage(finalPercentage);
+    
+    // Store source code for later display
+    window.testSourceCode = results.sourceCode;
+    
+    // Create test elements with staggered animation
+    results.tests.forEach((test, index) => {
+      setTimeout(() => {
+        const testElement = createTestElement(test);
+        testResultsContainer.appendChild(testElement);
+        
+        // Recreate icons for this element
+        lucide.createIcons();
+        
+        // If this is the last element, initialize search and event handlers
+        if (index === results.tests.length - 1) {
+          setTimeout(initializeEventHandlers, 100);
+        }
+      }, index * 50); // Stagger animations by 50ms
+    });
+  }
+
+  function initializeEventHandlers() {
+    // Test header click handler for expand/collapse
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('.test-header')) {
+        const header = e.target.closest('.test-header');
+        const details = header.nextElementSibling;
+        
+        if (details && details.classList.contains('test-details')) {
+          if (details.classList.contains('hidden')) {
+            details.classList.remove('hidden');
+            details.style.animation = 'slideUp 0.3s ease-out';
+          } else {
+            details.style.animation = 'fadeOut 0.2s ease-out';
+            setTimeout(() => {
+              details.classList.add('hidden');
+            }, 200);
+          }
+        }
+      }
+    });
+
+    // Expand All button
+    const expandAllBtn = document.getElementById('expandAll');
+    if (expandAllBtn) {
+      expandAllBtn.addEventListener('click', function() {
+        document.querySelectorAll('.test-details').forEach(details => {
+          details.classList.remove('hidden');
+          details.style.animation = 'slideUp 0.2s ease-out';
+        });
+      });
+    }
+
+    // Collapse All button
+    const collapseAllBtn = document.getElementById('collapseAll');
+    if (collapseAllBtn) {
+      collapseAllBtn.addEventListener('click', function() {
+        document.querySelectorAll('.test-details').forEach(details => {
+          details.style.animation = 'fadeOut 0.2s ease-out';
+          setTimeout(() => {
+            details.classList.add('hidden');
+          }, 200);
+        });
+      });
+    }
+
+    // Filter buttons
+    document.querySelectorAll('[data-filter]').forEach(button => {
+      button.addEventListener('click', function() {
+        const filter = this.getAttribute('data-filter');
+        const testResults = document.querySelectorAll('.test-result');
+        
+        // Show/hide tests based on filter
+        testResults.forEach(test => {
+          if (filter === 'all') {
+            test.classList.remove('hidden');
+          } else {
+            if (test.getAttribute('data-status') === filter) {
+              test.classList.remove('hidden');
+            } else {
+              test.classList.add('hidden');
+            }
+          }
+        });
+        
+        // Update active state
+        document.querySelectorAll('[data-filter]').forEach(btn => {
+          btn.classList.remove('active', 'bg-primary', 'text-primary-foreground');
+          btn.classList.add('bg-background');
+        });
+        this.classList.add('active', 'bg-primary', 'text-primary-foreground');
+        this.classList.remove('bg-background');
+        
+        // Clear search when switching filters
+        const searchInput = document.getElementById('testSearch');
+        if (searchInput) {
+          searchInput.value = '';
+        }
+        updateNoResultsMessage();
+      });
+    });
+
+    // View toggle buttons
+    document.querySelectorAll('[data-view]').forEach(button => {
+      button.addEventListener('click', function() {
+        const view = this.getAttribute('data-view');
+        const testResultsContainer = document.getElementById('test-results');
+        const codeViewContainer = document.getElementById('code-view');
+        
+        if (view === 'results') {
+          testResultsContainer.classList.remove('hidden');
+          codeViewContainer.classList.add('hidden');
+        } else if (view === 'code') {
+          testResultsContainer.classList.add('hidden');
+          codeViewContainer.classList.remove('hidden');
+          displaySourceCode();
+        }
+        
+        // Update active state
+        document.querySelectorAll('[data-view]').forEach(btn => {
+          btn.classList.remove('active', 'bg-primary', 'text-primary-foreground');
+          btn.classList.add('bg-background');
+        });
+        this.classList.add('active', 'bg-primary', 'text-primary-foreground');
+        this.classList.remove('bg-background');
+      });
+    });
+
+    // Copy code button
+    const copyButton = document.getElementById('copy-code');
+    if (copyButton) {
+      copyButton.addEventListener('click', function() {
+        const codeElement = document.querySelector('#source-code code');
+        if (codeElement && navigator.clipboard) {
+          navigator.clipboard.writeText(codeElement.textContent).then(() => {
+            // Show feedback
+            const originalIcon = this.innerHTML;
+            this.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+            lucide.createIcons();
+            setTimeout(() => {
+              this.innerHTML = originalIcon;
+              lucide.createIcons();
+            }, 2000);
+          }).catch(err => {
+            console.error('Failed to copy code:', err);
+          });
+        }
+      });
+    }
+
+    // Individual test view toggle buttons
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('[data-test-view]')) {
+        const button = e.target.closest('[data-test-view]');
+        const view = button.getAttribute('data-test-view');
+        const testName = button.getAttribute('data-test-name');
+        const testCard = button.closest('.test-result');
+        
+        if (testCard) {
+          // Hide all test view contents
+          testCard.querySelectorAll('[data-test-view-content]').forEach(content => {
+            content.classList.add('hidden');
+          });
+          
+          // Show the selected view content
+          const selectedContent = testCard.querySelector(`[data-test-view-content="${view}"]`);
+          if (selectedContent) {
+            selectedContent.classList.remove('hidden');
+          }
+          
+          // Update button states
+          testCard.querySelectorAll('[data-test-view]').forEach(btn => {
+            btn.classList.remove('bg-primary', 'text-primary-foreground');
+            btn.classList.add('bg-background', 'hover:bg-accent');
+          });
+          button.classList.add('bg-primary', 'text-primary-foreground');
+          button.classList.remove('bg-background', 'hover:bg-accent');
+        }
+      }
+    });
+
+    // Individual test copy code buttons
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('.copy-test-code')) {
+        const copyButton = e.target.closest('.copy-test-code');
+        const testName = copyButton.getAttribute('data-test-name');
+        const testCard = copyButton.closest('.test-result');
+        
+        if (testCard) {
+          const codeElement = testCard.querySelector('code');
+          if (codeElement && navigator.clipboard) {
+            navigator.clipboard.writeText(codeElement.textContent).then(() => {
+              // Show feedback
+              const originalIcon = copyButton.innerHTML;
+              copyButton.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+              lucide.createIcons();
+              setTimeout(() => {
+                copyButton.innerHTML = originalIcon;
+                lucide.createIcons();
+              }, 2000);
+            }).catch(err => {
+              console.error('Failed to copy test code:', err);
+            });
+          }
+        }
+      }
+    });
+
+    // Initialize search
+    initializeSearch();
+  }
+
+  function displaySourceCode() {
+    const sourceCodeElement = document.querySelector('#source-code code');
+    if (sourceCodeElement && window.testSourceCode) {
+      sourceCodeElement.textContent = window.testSourceCode;
+    }
+  }
+
+  function initializeSearch() {
+    const searchInput = document.getElementById('testSearch');
+    
+    // Debounce function to prevent too many searches while typing
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function highlightText(text, term) {
+      if (!term) return text;
+      const regex = new RegExp(`(${term})`, 'gi');
+      return text.replace(regex, `<mark class="bg-amber-200 dark:bg-amber-900/40 px-1 rounded">\$1</mark>`);
+    }
+
+    function performSearch() {
+      const searchTerm = searchInput.value.toLowerCase();
+      const testResults = document.querySelectorAll('.test-result');
+      let matchFound = false;
+
+      testResults.forEach(test => {
+        const originalTestName = test.getAttribute('data-test-name') || '';
+        const originalModuleName = test.getAttribute('data-test-module') || '';
+        const testNameElement = test.querySelector('.test-name');
+        const moduleNameElement = test.querySelector('.test-module-name');
+
+        let score = 0;
+
+        if (originalTestName.includes(searchTerm)) score += 3;
+        if (originalModuleName.includes(searchTerm)) score += 2;
+
+        if (score > 0 || !searchTerm) {
+          test.classList.remove('hidden');
+          if (testNameElement) {
+            testNameElement.innerHTML = highlightText(originalTestName, searchTerm);
+          }
+          if (moduleNameElement) {
+            moduleNameElement.innerHTML = highlightText(originalModuleName, searchTerm);
+          }
+          matchFound = true;
+        } else {
+          if (testNameElement) {
+            testNameElement.textContent = originalTestName;
+          }
+          if (moduleNameElement) {
+            moduleNameElement.textContent = originalModuleName;
+          }
+          test.classList.add('hidden');
+        }
+      });
+
+      updateNoResultsMessage(matchFound, searchTerm);
+    }
+
+    function updateNoResultsMessage(matchFound = true, searchTerm = '') {
+      const noResultsElement = document.getElementById('no-results');
+      if (!matchFound && searchTerm) {
+        noResultsElement.classList.remove('hidden');
+      } else {
+        noResultsElement.classList.add('hidden');
+      }
+    }
+
+    // Add search event listener with debounce
+    if (searchInput) {
+      searchInput.addEventListener('input', debounce(performSearch, 300));
+    }
+  }
+
+  // Make updateNoResultsMessage available globally
+  function updateNoResultsMessage(matchFound = true, searchTerm = '') {
+    const noResultsElement = document.getElementById('no-results');
+    const visibleTests = document.querySelectorAll('.test-result:not(.hidden)').length;
+    
+    if (visibleTests === 0) {
+      noResultsElement.classList.remove('hidden');
+    } else {
+      noResultsElement.classList.add('hidden');
+    }
+  }
+</script>

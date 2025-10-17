@@ -1,0 +1,19 @@
+{
+  "timeZone": "America/Bogota",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "CamDB",
+        "version": "0",
+        "libraryId": "1TJEgrBnjb_B8PVCnHstDzMmllYqR2dZuBVQUvprPYohST5uwPBuuxfcI",
+        "developmentMode": true
+      }
+    ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "MYSELF"
+  }
+}

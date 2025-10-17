@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    
+    <!-- Tailwind CSS v4 Beta -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              'sans': ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+              'mono': ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
+            },
+            colors: {
+              border: "var(--border)",
+              input: "var(--input)",
+              ring: "var(--ring)",
+              background: "var(--background)",
+              foreground: "var(--foreground)",
+              primary: {
+                DEFAULT: "var(--primary)",
+                foreground: "var(--primary-foreground)",
+              },
+              secondary: {
+                DEFAULT: "var(--secondary)",
+                foreground: "var(--secondary-foreground)",
+              },
+              destructive: {
+                DEFAULT: "var(--destructive)",
+                foreground: "var(--destructive-foreground)",
+              },
+              muted: {
+                DEFAULT: "var(--muted)",
+                foreground: "var(--muted-foreground)",
+              },
+              accent: {
+                DEFAULT: "var(--accent)",
+                foreground: "var(--accent-foreground)",
+              },
+              popover: {
+                DEFAULT: "var(--popover)",
+                foreground: "var(--popover-foreground)",
+              },
+              card: {
+                DEFAULT: "var(--card)",
+                foreground: "var(--card-foreground)",
+              },
+            },
+            borderRadius: {
+              lg: "var(--radius)",
+              md: "calc(var(--radius) - 2px)",
+              sm: "calc(var(--radius) - 4px)",
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-in-out',
+              'slide-up': 'slideUp 0.3s ease-out',
+              'pulse-success': 'pulseSuccess 2s ease-in-out infinite',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              slideUp: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              pulseSuccess: {
+                '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+                '50%': { transform: 'scale(1.05)', opacity: '0.8' },
+              },
+            },
+          },
+        },
+      }
+    </script>
+    
+    <?!= include("styles.css");?>
+  </head>
+  <body class="bg-background text-foreground font-sans min-h-screen">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div class="flex flex-col items-center space-y-4">
+        <div class="relative">
+          <div class="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+          <div class="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-accent rounded-full animate-spin" style="animation-delay: -0.15s; animation-duration: 1.5s;"></div>
+        </div>
+        <div class="text-center">
+          <h3 class="text-lg font-semibold text-foreground">Running Test Suite</h3>
+          <p class="text-muted-foreground">Please wait while tests execute...</p>
+          <div class="mt-2 text-sm text-muted-foreground">
+            <span id="loading-timer">0s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+      <!-- Header Card -->
+      <div class="bg-card border border-border rounded-lg shadow-sm mb-6">
+        <div class="border-b border-border p-6">
+          <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-primary/10 rounded-lg">
+                <i data-lucide="flask-conical" class="w-6 h-6 text-primary"></i>
+              </div>
+              <div>
+                <h1 class="text-2xl font-bold text-card-foreground">Test Suite Results</h1>
+                <p class="text-muted-foreground">Comprehensive testing dashboard</p>
+              </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-4">
+              <!-- Execution Time -->
+              <div class="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md">
+                <i data-lucide="clock" class="w-4 h-4 text-muted-foreground"></i>
+                <span class="text-sm font-mono" id="execution-time">0.00s</span>
+              </div>
+              
+              <!-- Pass Percentage -->
+              <div class="flex items-center gap-2">
+                <div class="text-right">
+                  <div class="text-2xl font-bold font-mono text-primary" id="testPassedPerc">0%</div>
+                  <div class="text-xs text-muted-foreground">passing</div>
+                </div>
+              </div>
+              
+              <!-- Theme Toggle -->
+              <button 
+                id="themeToggle" 
+                class="p-2 hover:bg-accent rounded-md transition-colors border border-border"
+                aria-label="Toggle theme"
+              >
+                <i data-lucide="sun" class="w-4 h-4 dark:hidden"></i>
+                <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Progress Bar -->
+          <div class="mt-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-muted-foreground">Overall Progress</span>
+              <div id="summary-badges" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div class="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div 
+                id="progress-bar" 
+                class="h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000 ease-out"
+                style="width: 0%"
+              ></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="p-6">
+          <div class="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <!-- Search -->
+            <div class="relative flex-1 max-w-md">
+              <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground"></i>
+              <input
+                type="text"
+                id="testSearch"
+                class="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                placeholder="Search tests..."
+                aria-label="Search tests"
+              >
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-2">
+              <!-- Expand/Collapse -->
+              <div class="flex border border-border rounded-md overflow-hidden">
+                <button 
+                  type="button" 
+                  class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors border-r border-border" 
+                  id="expandAll"
+                >
+                  <i data-lucide="chevron-down" class="w-4 h-4 inline mr-1"></i>
+                  Expand All
+                </button>
+                <button 
+                  type="button" 
+                  class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors" 
+                  id="collapseAll"
+                >
+                  <i data-lucide="chevron-up" class="w-4 h-4 inline mr-1"></i>
+                  Collapse All
+                </button>
+              </div>
+              
+              <!-- Advanced Test Runner Button -->
+              <div class="flex border border-border rounded-md overflow-hidden">
+                <button 
+                  type="button" 
+                  class="px-3 py-2 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" 
+                  id="runAdvancedTests"
+                >
+                  <i data-lucide="play" class="w-4 h-4 inline mr-1"></i>
+                  Run Advanced Tests
+                </button>
+              </div>
+              
+              <!-- Filter Buttons -->
+              <div class="flex border border-border rounded-md overflow-hidden">
+                <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors border-r border-border active" data-filter="all">All</button>
+                <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors border-r border-border" data-filter="passed">
+                  <i data-lucide="check" class="w-3 h-3 inline mr-1"></i>
+                  Passed
+                </button>
+                <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors border-r border-border" data-filter="failed">
+                  <i data-lucide="x" class="w-3 h-3 inline mr-1"></i>
+                  Failed
+                </button>
+                <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors" data-filter="skipped">
+                  <i data-lucide="minus" class="w-3 h-3 inline mr-1"></i>
+                  Skipped
+                </button>
+              </div>
+              
+              <!-- View Toggle -->
+              <div class="flex border border-border rounded-md overflow-hidden">
+                <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors border-r border-border active" data-view="results">
+                  <i data-lucide="list" class="w-3 h-3 inline mr-1"></i>
+                  Results
+                </button>
+                <button type="button" class="px-3 py-2 text-sm bg-background hover:bg-accent transition-colors" data-view="code">
+                  <i data-lucide="code" class="w-3 h-3 inline mr-1"></i>
+                  Code
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Test Results -->
+      <div id="test-results" class="space-y-4"></div>
+      
+      <!-- Code View -->
+      <div id="code-view" class="hidden">
+        <div class="bg-card border border-border rounded-lg shadow-sm">
+          <div class="border-b border-border p-4">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-primary/10 rounded-lg">
+                <i data-lucide="file-text" class="w-5 h-5 text-primary"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-card-foreground">Test Suite Source Code</h2>
+                <p class="text-muted-foreground">Complete test implementation</p>
+              </div>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="relative">
+              <pre id="source-code" class="bg-muted/50 rounded-lg p-4 overflow-x-auto text-sm font-mono max-h-96 overflow-y-auto border"><code class="language-javascript">// Loading test source code...</code></pre>
+              <button 
+                id="copy-code" 
+                class="absolute top-3 right-3 p-2 bg-background border border-border rounded-md hover:bg-accent transition-colors"
+                title="Copy to clipboard"
+              >
+                <i data-lucide="copy" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- No Results Message -->
+      <div id="no-results" class="hidden text-center py-12">
+        <div class="text-muted-foreground">
+          <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-4 opacity-50"></i>
+          <h3 class="text-lg font-semibold mb-2">No matching tests found</h3>
+          <p>Try adjusting your search criteria or filters</p>
+        </div>
+      </div>
+    </div>
+    <!-- Initialize Lucide Icons -->
+    <script>
+      // Initialize Lucide icons after DOM is loaded
+      document.addEventListener('DOMContentLoaded', function() {
+        lucide.createIcons();
+      });
+    </script>
+    
+    <!-- Include main JavaScript -->
+    <?!= include("main.js");?>
+  </body>
+</html>
